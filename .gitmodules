@@ -1,0 +1,3 @@
+[submodule "deps/xxhash"]
+	path = deps/xxhash
+	url = git@github.com:Cyan4973/xxHash.git

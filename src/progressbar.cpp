@@ -1,10 +1,8 @@
 #include "progressbar.hpp"
 
-  // return std::make_pair<std::size_t, std::size_t>(term_winsize_s.ws_col, term_winsize_s.ws_row);
+
 
 ProgressBar::ProgressBar(std::size_t total) : total(total), subtotal(0) {}
-
-//  return std::make_pair<std::size_t, std::size_t>(term_winsize_s.ws_col, term_winsize_s.ws_row);
 
 void ProgressBar::update_terminal_size() {
   ioctl(0, TIOCGWINSZ, &term_winsize_s);
@@ -61,7 +59,10 @@ void ProgressBar::update() {
 
 // Convenience member function for automatically adding \r or \n and displaying the bar.
 void ProgressBar::display() {
-  std::string endchar = (subtotal >= total) ? "\n" : "\r";
+  char endchar = '\r';
+  if (subtotal >= total) {
+    endchar = '\n';
+  }
   std::cout << bar << endchar;
 }
 

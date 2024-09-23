@@ -7,9 +7,6 @@
 #include <string>
 #include <vector>
 
-#include "xxh3.h"
-
-
 // Just a blob of data
 struct TimeStats {
   std::size_t proc_start;
@@ -40,5 +37,4 @@ auto ftime(std::size_t seconds) -> std::string;
 auto fsize(std::size_t bytes, bool use_binary_prefix) -> std::string;
 
 // Hexdigest for xxhash hashes
-auto hexdigest(XXH64_hash_t hash) -> std::string;
-auto hexdigest(XXH128_hash_t hash) -> std::string;
+auto hexdigest(std::uint64_t hash) -> std::string;

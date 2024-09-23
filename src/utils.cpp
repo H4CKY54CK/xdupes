@@ -102,12 +102,8 @@ auto fsize(std::size_t bytes, bool use_binary_prefix) -> std::string {
   return oss.str();
 }
 
-auto hexdigest(XXH64_hash_t hash) -> std::string {
+auto hexdigest(std::uint64_t hash) -> std::string {
   std::ostringstream oss;
   oss << std::setbase(16) << std::setfill('0') << std::setw(16) << hash;
   return oss.str();
-}
-
-auto hexdigest(XXH128_hash_t hash) -> std::string {
-  return hexdigest(hash.high64) + hexdigest(hash.low64);
 }

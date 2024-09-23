@@ -100,10 +100,8 @@ void logging::Logger::debug(const std::string& msg) {
 std::map<std::string, logging::Logger> logging::_logger_registry;
 
 // Get logger by name
-auto logging::get_logger(const std::string& name) -> logging::Logger& {
-  if (_logger_registry.count(name) == 0)
-    _logger_registry.emplace(name, name);
-  return _logger_registry.at(name);
+auto logging::get_logger(const std::string& name) -> Logger& {
+  return _logger_registry.try_emplace(name, name).first->second;
 }
 
 // The "global" logger. It always exists.

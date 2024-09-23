@@ -22,14 +22,14 @@
 
 ## ThreadPool
 
-- With the new parsing system finally in place, some changes were made regarding when values parsed by the parser are validated. My first and immediate concern is to make sure `ThreadPool` is getting the correct argument passed to it. It must be positive (this is actually checked during parsing, completely coincidentally)... And that's it. Passing 0 to it means "auto", and passing any other integer uses that integer.
+- ~~With the new parsing system finally in place, some changes were made regarding when values parsed by the parser are validated. My first and immediate concern is to make sure `ThreadPool` is getting the correct argument passed to it. It must be positive (this is actually checked during parsing, completely coincidentally)... And that's it. Passing 0 to it means "auto", and passing any other integer uses that integer.~~ I believe this is covered.
 
 
 ## Miscellaneous
 
-- There is a subtle error being triggered if `#include "parsing.hpp"` is *before* `#include "logging.hpp"`. For some reason, it is not possible to **not** `#include "logging.hpp"`. Investigate and fix.
+- ~~There is a subtle error being triggered if `#include "parsing.hpp"` is *before* `#include "logging.hpp"`. For some reason, it is not possible to **not** `#include "logging.hpp"`. Investigate and fix.~~ Pretty sure this is fixed, or will be with the next commit.
 
 
 ## ProgressBar
 
-- If the program is cancelled or interrupted after a progress bar has been displayed at least once but before it has had a chance to reset the cursor and text color, then there is nothing that will reset the terminal to a known good state. This needs to be addressed by catching a few signals; possibly: INT EXIT QUIT TERM
+- ~~If the program is cancelled or interrupted after a progress bar has been displayed at least once but before it has had a chance to reset the cursor and text color, then there is nothing that will reset the terminal to a known good state. This needs to be addressed by catching a few signals; possibly: INT EXIT QUIT TERM~~ Fixed, I think.

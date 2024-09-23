@@ -1,39 +1,28 @@
 ## Building from source
 
-Since you are reading this, you are likely in the root directory of the project.
+I've recently switched from Make to CMake. Here are the new build instructions:
 
-`make` (or `make -j 4` or whatever)
-
-All intermediary objects get put into `./obj`
-
-The binary executable is right next to you `./xdupes`
-
-## Other `make` targets
-
-Real quick: `make` == `make all`, `make all` == `make default`, and `make default` builds the executable.
-
-`make clean`
-    Removes `./obj` (all files that were created by `make` except for the executable)
-    Also removes the executable. lol
-
-`make strict`
-    Uses a bunch of flags that are more strict than what `make default` uses
-
-`make dev`
-    Uses a lower optimization level, includes debugging symbols, and is ALLEGEDLY faster.
-
-`make fresh`
-    Does `make clean` and then `make`. Might appear pointless, but this lets you do:
-    `make fresh -j 4`
-    without any weirdness.
-
-`make install`
-    Intended for me. I commented it out, as well. Strips the executable and installs it to `/usr/local/bin/`.
+```bash
+mkdir build
+cd build
+cmake --preset optimized ..
+make -j 4
+# There is currently no install command. But the executable should be right in front of you, in ./build/
+# Try it out on the current working directory. If there is no output, there are no duplicates.
+./xdupes --recursive ./
+# If you're bold, go ahead and immediately run it on your Pictures directory. Files are only ever read, so don't worry
+# about files being removed or anything. You should still be paranoid and try some test directories first.
+```
 
 
 ## Using the program
 
-Worry not, as `xdupes` does not (yet) do any auto-removal of any files. It only lists duplicate files, in groups, separated by newlines. By default, it does not search recursively. Also by default, it only uses 1 thread. Sort of.
+Worry not, as `xdupes` does not (yet) do any auto-removal of any files. It only lists duplicate files, in groups, 
+separated by newlines. By default, it does not search recursively. Also by default, it only uses 1 thread. Sort of. It
+uses 2 threads; a producer and a consumer. One feeds filenames, one reads them and hashes them. This was the optimal
+strategy.
+
+Here is some example output:
 
 ```
 one
@@ -72,17 +61,20 @@ Usage:
             Skip empty files (otherwise all empty files will be listed, as they all hash to the same thing)
         `--zero`
             Use `\0` instead of `\n` as the line separator
-        `--si`
+        `--si`/`--binary`
             Use KiB, MiB, etc. instead of KB, MB, etc.
-
-    Boolean Arguments (cont.) - Experimental
         `--progress`
-            Shows a progress bar (WIP still, only shows the progress bar during file traversal, not during hashing)
+            (NEW) This option enables progress reporting during the filesystem traversal (as a count, no bar), during
+            the queueing of the files into the job pool (as an actual progress bar), and during the hashing of the files
+            (also as an actual progress bar). Since files are already being hashed by all the jobs are queued, the
+            progress bar that shows the hashing progress will almost always start above 0%. For small amounts of small
+            files, the progress bar may not be visible for long, as the work is done very quickly.
 
     Boolean Arguments (cont.) - Options that affect how the output is written, and also the debug options.
         `--quiet`/`-q`
             Produce less output.
-        `--verbose'/'-v'
-            Produce more output.
+        `--quiet`/`-q`
+            Produce no output.
         `--debug`
-            Show some more information regarding what happened (currently just includes thread count and more detailed timing info).
+            Show some more information regarding what happened (currently just includes thread count and more detailed
+            timing info) (and now the file count and hashed file count).

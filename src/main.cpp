@@ -1,3 +1,5 @@
+#include <csignal>
+
 #include "logging.hpp"
 #include "parser.hpp"
 #include "progressbar.hpp"
@@ -6,10 +8,16 @@
 
 
 
+void restore_terminal(int s);
 
 auto create_parser() -> parsing::ArgumentParser;
 
 auto main(int argc, char** argv) -> int {
+
+  // Set handler for signal as early as possible.
+  std::signal(SIGTERM, restore_terminal);
+  std::signal(SIGINT, restore_terminal);
+
   namespace fs = std::filesystem;
 
   // It was getting hard to read with this monstrosity in the way.
@@ -225,6 +233,14 @@ auto main(int argc, char** argv) -> int {
   logger.debug("elapsed: overall: " + ftime_ns(stats.overall));
 
   return 0;
+}
+
+
+// Signal handler for when progress bar gets cancelled
+void restore_terminal(int s) {
+  // Clear line, restore cursor position, unhide cursor.
+  std::cout << "\x1b[2K\x1b[u\x1b[?25h\x1b[2K" << std::endl;
+  std::quick_exit(1);
 }
 
 

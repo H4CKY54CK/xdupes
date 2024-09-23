@@ -9,10 +9,6 @@
 
 namespace logging {
 
-  class Handler {
-
-  };
-
   // Logger for more personalized logging
   struct Logger {
     std::string name;
@@ -72,7 +68,7 @@ namespace logging {
 
   // Global convenience functions
   extern std::map<std::string, Logger> _logger_registry;
-  extern logging::Logger& _logger;
+  extern Logger& _logger;
 
   Logger& get_logger(const std::string& name);
 
