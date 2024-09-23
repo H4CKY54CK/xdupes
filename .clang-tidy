@@ -1,0 +1,5 @@
+Checks: 'performance-*,concurrency-*,clang-analyzer-*,portability-*,modernize-*'
+
+WarningsAsErrors: '*'
+
+UseColor: true
