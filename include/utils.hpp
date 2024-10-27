@@ -1,11 +1,17 @@
 #pragma once
 
 #include <chrono>
+#include <csignal>
 #include <filesystem>
 #include <iomanip>
+#include <iostream>
 #include <sstream>
 #include <string>
 #include <vector>
+
+
+void restore_terminal(int s);
+
 
 // Just a blob of data
 struct TimeStats {
@@ -25,6 +31,7 @@ auto is_number(const std::string& value) -> bool;
 
 // bad uwu
 auto repr(const std::string& value) -> std::string;
+auto repr(std::size_t value) -> std::string;
 auto join(const std::vector<std::string>& vec, const std::string& sep) -> std::string;
 auto repr_join(const std::vector<std::string>& vec, const std::string& sep) -> std::string;
 

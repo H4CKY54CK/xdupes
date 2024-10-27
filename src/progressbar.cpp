@@ -30,22 +30,20 @@ void ProgressBar::update(int amount) {
   // Progress in terms of percentage (convert both to float first)
   double l = subtotal;
   double r = total;
-  double progress;
+  double progress = 1;
 
   if (total > 0) {
     progress = l / r;
   }
-  else {
-    progress = 1;
-  }
 
   // How much to fill the bar
-  std::string filled(std::size_t(columns * progress), ' ');
-  std::string unfilled(std::size_t(columns - std::size_t(columns * progress)), ' ');
+  std::size_t f = columns * progress;
+  std::size_t uf = columns - f;
+  std::string filled(f, ' ');
+  std::string unfilled(uf, ' ');
 
   // Now make 'progress' a percentage
   progress *= 100.0;
-
 
   std::ostringstream oss;
   oss << prefix << "|" << "\x1b[42m" << filled << "\x1b[00m" << unfilled << "|" << suffix << std::fixed << std::setprecision(1) << std::setw(5) << progress << "%";

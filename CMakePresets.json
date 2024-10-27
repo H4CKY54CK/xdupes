@@ -1,49 +1,135 @@
 {
-  "version": 1,
+  "version": 6,
   "cmakeMinimumRequired": {
     "major": 3,
-    "minor": 19,
+    "minor": 25,
     "patch": 0
   },
+
   "configurePresets": [
     {
       "name": "default",
-      "displayName": "Default",
-      "description": "Default build",
+      "hidden": true,
       "generator": "Unix Makefiles",
       "binaryDir": "${sourceDir}/build",
       "cacheVariables": {
-        "CMAKE_CXX_FLAGS": "-Werror -Wall -Wextra -pedantic",
         "CMAKE_CXX_STANDARD": "17",
         "CMAKE_CXX_STANDARD_REQUIRED": "YES",
         "CMAKE_CXX_EXTENSIONS": "OFF"
       }
     },
     {
-      "name": "optimized",
-      "displayName": "Optimized",
-      "description": "Optimized build",
-      "generator": "Unix Makefiles",
-      "binaryDir": "${sourceDir}/build",
+      "name": "dev",
+      "inherits": "default",
+      "displayName": "Dev",
+      "description": "Dev Preset",
       "cacheVariables": {
-        "CMAKE_CXX_FLAGS": "-O2 -march=native -mtune=native",
-        "CMAKE_CXX_STANDARD": "17",
-        "CMAKE_CXX_STANDARD_REQUIRED": "YES",
-        "CMAKE_CXX_EXTENSIONS": "OFF"
+        "CMAKE_CXX_FLAGS": "-Werror -Wall -Wextra -pedantic"
+      }
+    },
+    {
+      "name": "release",
+      "inherits": "default",
+      "displayName": "Release",
+      "description": "Release Preset",
+      "cacheVariables": {
+        "CMAKE_CXX_FLAGS": "-O2 -march=native -mtune=native"
       }
     },
     {
       "name": "debug",
+      "inherits": "default",
       "displayName": "Debug",
-      "description": "Debug build",
-      "generator": "Unix Makefiles",
-      "binaryDir": "${sourceDir}/build",
+      "description": "Debug Preset",
       "cacheVariables": {
-        "CMAKE_CXX_FLAGS": "-Og -g",
-        "CMAKE_CXX_STANDARD": "17",
-        "CMAKE_CXX_STANDARD_REQUIRED": "YES",
-        "CMAKE_CXX_EXTENSIONS": "OFF"
+        "CMAKE_CXX_FLAGS": "-O0 -g3"
       }
     }
-  ]
+  ],
+
+  "buildPresets": [
+    {
+      "name": "default",
+      "hidden": true,
+      "verbose": true,
+      "jobs": 6
+    },
+    {
+      "name": "dev",
+      "inherits": "default",
+      "displayName": "Dev",
+      "description": "Dev Build",
+      "verbose": false,
+      "configurePreset": "dev"
+    },
+    {
+      "name": "release",
+      "inherits": "default",
+      "displayName": "Release",
+      "description": "Release Build",
+      "verbose": false,
+      "configurePreset": "release"
+    },
+    {
+      "name": "debug",
+      "inherits": "default",
+      "displayName": "Debug",
+      "description": "Debug Build",
+      "configurePreset": "debug"
+    }
+  ],
+
+  "workflowPresets": [
+    {
+      "name": "dev",
+      "displayName": "Dev",
+      "description": "Dev Workflow",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "dev"
+        },
+        {
+          "type": "build",
+          "name": "dev"
+        }
+      ]
+    },
+    {
+      "name": "release",
+      "displayName": "Release",
+      "description": "Release Workflow",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "release"
+        },
+        {
+          "type": "build",
+          "name": "release"
+        }
+      ]
+    },
+    {
+      "name": "debug",
+      "displayName": "Debug",
+      "description": "Debug Workflow",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "debug"
+        },
+        {
+          "type": "build",
+          "name": "debug"
+        }
+      ]
+    }
+  ],
+
+  "vendor": {
+    "hashjacks.com/xdupes/0.1.1": {
+      "debug": false
+    }
+  }
 }

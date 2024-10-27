@@ -2,6 +2,15 @@
 
 
 
+
+// Signal handler for when progress bar gets cancelled
+void restore_terminal(int s) {
+  // Clear line, restore cursor position, unhide cursor.
+  std::cout << "\x1b[2K\x1b[u\x1b[?25h\x1b[2K" << std::endl;
+  std::quick_exit(s);
+}
+
+
 // TIME. IS MARCHING ON.
 auto now() -> std::size_t {
   return std::chrono::steady_clock::now().time_since_epoch().count();
@@ -21,6 +30,13 @@ auto is_number(const std::string& value) -> bool {
 auto repr(const std::string& value) -> std::string {
   std::ostringstream oss;
   oss << std::quoted(value);
+  return oss.str();
+}
+
+// A less-bad-but-still-not-good implementation of Python's repr.
+auto repr(std::size_t value) -> std::string {
+  std::ostringstream oss;
+  oss << value;
   return oss.str();
 }
 

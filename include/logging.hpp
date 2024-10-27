@@ -1,6 +1,7 @@
 #pragma once
 
 #include <iostream>
+#include <sstream>
 #include <map>
 #include <string>
 #include <vector>
@@ -22,12 +23,6 @@ namespace logging {
     // Get and set level for an instance of a logger
     auto get_level() -> std::size_t;
     void set_level(std::size_t level);
-
-    // Get level color for an instance of a logger
-    auto get_level_color(std::size_t level) -> std::string;
-
-    // Get level name for an instance of a logger
-    auto get_level_name(std::size_t level) -> std::string;
 
     // Convenience methods
     void log(std::size_t level, const std::string& msg);

@@ -1,14 +1,9 @@
-#include <csignal>
-
 #include "logging.hpp"
 #include "parser.hpp"
 #include "progressbar.hpp"
 #include "threadpool.hpp"
 #include "utils.hpp"
 
-
-
-void restore_terminal(int s);
 
 auto create_parser() -> parsing::ArgumentParser;
 
@@ -20,33 +15,37 @@ auto main(int argc, char** argv) -> int {
 
   namespace fs = std::filesystem;
 
-  // It was getting hard to read with this monstrosity in the way.
-  auto parser = create_parser();
-  logging::Logger& logger = logging::get_logger("xdupes");
-
-  auto options = parser.parse_args(argc - 1, argv + 1);
-
-  auto quiet = options["quiet"].as_bool();
-  auto silent = options["silent"].as_bool();
-  auto progress = options["progress"].as_bool();
-
-  // Get a better argument parser.
-  if (!is_number(options["threads"].as_string())) {
-    logger.error("threads must be a positive integer");
-    std::quick_exit(1);
-  }
-
   TimeStats stats;
 
   // Start timer
   std::size_t t0 = now();
   stats.proc_start = t0;
 
+  // It was getting hard to read with this monstrosity in the way.
+  auto parser = create_parser();
+  logging::Logger& logger = logging::get_logger("xdupes");
+
+  auto options = parser.parse_args(argc - 1, argv + 1);
+
   // Log time for parsing
   stats.parsing = now() - t0;
 
+  // Convenience
+  auto quiet = options["quiet"].as_bool();
+  auto silent = options["silent"].as_bool();
+  auto progress = options["progress"].as_bool();
+
+  // Set logging for logger, prior to using the logger
   logger.set_level(options["loglevel"].as_size_t());
 
+  // Get a better argument parser.
+  // Remove this after typing is added to the Arguments
+  if (!is_number(options["threads"].as_string())) {
+    logger.error("threads must be a positive integer");
+    return 1;
+  }
+
+  // Really, the ArgumentParser should be handling this
   if (options["sources"].as_strings().size() == 0) {
     logger.error("missing SOURCE(s) arguments");
     return 1;
@@ -55,44 +54,51 @@ auto main(int argc, char** argv) -> int {
   // Reset timer
   t0 = now();
 
-  std::deque<fs::path> stack;
   std::vector<std::string> sources = options["sources"].as_strings();
-  stack.insert(stack.end(), std::make_move_iterator(sources.begin()), std::make_move_iterator(sources.end()));
+
+  std::sort(sources.begin(), sources.end(), [](auto left, auto right) { return left < right; });
+
+  std::vector<std::string> stack;
+  std::string path;
+
+  for (const auto& item : sources) {
+    path = item.substr(0, item.find_last_not_of("/") + 1);
+    for (const auto& prefix : stack) {
+      if (path.substr(0, prefix.size()) == prefix) {
+        goto next_item;
+      }
+    }
+    stack.emplace_back(path);
+    next_item:
+    continue;
+  }
 
   fs::path source;
   std::map<std::size_t,std::vector<std::string>> sizes;
-  std::set<fs::path> seen;
 
   std::size_t total_walked = 0;
   std::size_t total_hashed = 0;
 
   // Hide cursor, save cursor position
   if (progress) {
-    std::cout << "\x1b[?25l\x1b[s";
+    std::cout << "\x1b[s\x1b[?25l";
   }
 
   while (!stack.empty()) {
     source = stack.front();
-    stack.pop_front();
+    stack.erase(stack.begin());
 
     if (progress) {
       std::cout << "Files Walked: " << total_walked << "\x1b[u";
     }
 
-    if (file_is_unreadable(source)) {
-      logger.warn("permission denied: " + repr(source.native()));
-      continue;
-    }
-
-    if (seen.count(source)) {
-      continue;
-    }
-
-    seen.insert(source);
-
-
     if (!fs::exists(source)) {
       logger.warn("invalid directory: " + repr(source));
+      continue;
+    }
+
+    if (file_is_unreadable(source)) {
+      logger.warn("permission denied: " + repr(source.native()));
       continue;
     }
 
@@ -114,22 +120,17 @@ auto main(int argc, char** argv) -> int {
     }
   }
 
-  // if (progress) {
-  //   // We double clear in case we happened to spill over onto the next line. We clear that line, return to ours, and
-  //   // then clear our line. If we didn't spill over, then this just clears twice and that's harmless.
-  //   std::cout << "\x1b[2K\x1b[u\x1b[2K";
-  // }
-
+  // For some reason, if I do this inside the [size,files] loops, I get string error
   if (options["skip-empty"].as_bool()) {
     sizes[0].clear();
   }
 
-
   // Log time for filesystem traversal
   stats.filesystem = now() - t0;
 
+
   for (const auto& [size, files] : sizes) {
-    if (files.size() == 1) {
+    if (files.size() < 2) {
       continue;
     }
     total_hashed += files.size();
@@ -141,17 +142,15 @@ auto main(int argc, char** argv) -> int {
   ThreadPool tp(options["threads"].as_size_t());
 
   ProgressBar pbar(total_hashed);
-  pbar.set_prefix("Queueing tasks: ");
 
   tp.start();
 
   if (progress) {
-    pbar.update(0);
-    std::cout << pbar.bar << '\r';
+    pbar.set_prefix("Queueing tasks: ");
   }
 
   for (const auto& [size, files] : sizes) {
-    if (files.size() == 1) {
+    if (files.size() < 2) {
       continue;
     }
     for (const auto& item : files) {
@@ -162,31 +161,28 @@ auto main(int argc, char** argv) -> int {
       }
     }
   }
-  // if (progress) {
-  //   // We double clear in case we happened to spill over onto the next line. We clear that line, return to ours, and
-  //   // then clear our line. If we didn't spill over, then this just clears twice and that's harmless.
-  //   std::cout << "\x1b[2K\x1b[u\x1b[2K";
-  // }
-
-
-  pbar.reset();
-  pbar.set_prefix("Hashing files:  ");
-
 
   if (progress) {
+    pbar.reset();
+    pbar.set_prefix("Hashing files:  ");
+  }
+
+  if (progress) {
+    std::size_t td;
     while (tp.busy()) {
       {
         std::unique_lock<std::mutex> lock(tp.total_mutex);
-        pbar.set_progress(tp.total_done);
+        td = tp.total_done;
       }
+      pbar.set_progress(tp.total_done);
       std::cout << pbar.bar << "\x1b[u";
+      if (td == total_hashed) {
+        break;
+      }
       std::this_thread::sleep_for(std::chrono::microseconds(10));
     }
-    if (pbar.subtotal < tp.total_done) {
-      pbar.set_progress(total_hashed);
-      std::cout << pbar.bar << "\x1b[u";
-    }
-    std::cout << "\x1b[2K\x1b[u\x1b[2K\x1b[?25h";
+    pbar.set_progress(total_hashed);
+    std::cout << pbar.bar << "\x1b[2K\x1b[u\x1b[2K\x1b[?25h";
     std::cout.flush();
   }
 
@@ -235,15 +231,6 @@ auto main(int argc, char** argv) -> int {
   return 0;
 }
 
-
-// Signal handler for when progress bar gets cancelled
-void restore_terminal(int s) {
-  // Clear line, restore cursor position, unhide cursor.
-  std::cout << "\x1b[2K\x1b[u\x1b[?25h\x1b[2K" << std::endl;
-  std::quick_exit(1);
-}
-
-
 auto create_parser() -> parsing::ArgumentParser {
   parsing::ArgumentParser parser("xdupes");
 
@@ -260,23 +247,23 @@ auto create_parser() -> parsing::ArgumentParser {
   );
   parser.add_argument(
     parsing::Argument({"--recursive", "-r"})
-      .action("store_true")
+      .action(parsing::actions::store_true)
       .help("Walk all subdirectories of SOURCES.")
   );
   parser.add_argument(
     parsing::Argument({"--noempty", "--skip-empty"})
-      .action("store_true")
+      .action(parsing::actions::store_true)
       .help("Skip empty files (all empty files hash to the same value, so it's worth skipping them. This may default to true in the future.).")
   );
 
   parser.add_argument(
     parsing::Argument({"--quiet", "-q"})
-      .action("store_true")
+      .action(parsing::actions::store_true)
       .help("Don't display the files (still displays anything else that is normally displayed).")
   );
   parser.add_argument(
     parsing::Argument({"--silent", "-s"})
-      .action("store_true")
+      .action(parsing::actions::store_true)
       .help("Show no output.")
   );
 
@@ -289,29 +276,29 @@ auto create_parser() -> parsing::ArgumentParser {
   parser.add_argument(
     parsing::Argument({"--debug"})
       .dest("loglevel")
-      .action("store_const")
+      .action(parsing::actions::store_const)
       .const_value("10")
       .help("Show all output.")
   );
 
   parser.add_argument(
     parsing::Argument({"--timed"})
-      .action("store_true")
+      .action(parsing::actions::store_true)
       .help("Show elapsed time from the moment parsing has finished to the moment the program is done doing its work.")
   );
   parser.add_argument(
     parsing::Argument({"--wasted", "--wasted-space"})
-      .action("store_true")
+      .action(parsing::actions::store_true)
       .help("Show total_hashed space taken up by duplicate files (not including the unique one).")
   );
   parser.add_argument(
     parsing::Argument({"--si", "--binary"})
-      .action("store_true")
+      .action(parsing::actions::store_true)
       .help("Use binary prefixes (KiB, MiB, etc.) instead of the default (KB, MB, etc.).")
   );
   parser.add_argument(
     parsing::Argument({"--progress"})
-      .action("store_true")
+      .action(parsing::actions::store_true)
       .help("Show a helpful progress bar instead of the nothing that currently gets shown.")
   );
   parser.add_argument(
@@ -319,7 +306,7 @@ auto create_parser() -> parsing::ArgumentParser {
       .dest("separator")
       .default_value("\n")
       .const_value("\0")
-      .action("store_const")
+      .action(parsing::actions::store_const)
       .help("Use a null-terminator instead of newline to separate files and groups in the output.")
   );
   return parser;

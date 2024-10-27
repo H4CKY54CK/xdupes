@@ -1,8 +1,13 @@
 # Current Issues
 
+## STOP PUSHING RANDOM UPDATES
+
+- Start using semver, dude. Seriously.
+
+
 ## Argument
 
-- `Argument::action(std::string)` must do extra work to ensure a valid action is being used. Switch to an enum. Then the work can be eliminated.
+- ~~`Argument::action(std::string)` must do extra work to ensure a valid action is being used. Switch to an enum. Then the work can be eliminated.~~ Fixed
 
     - In a similar vain, it also current overwrites user-provided default and const values that are empty strings. If the user explicitly provided it, don't overwrite it. A simple member `user_provided` should suffice.
 

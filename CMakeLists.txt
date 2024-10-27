@@ -1,8 +1,6 @@
-cmake_minimum_required(VERSION 3.19 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.25 FATAL_ERROR)
 
-set(CMAKE_CXX_STANDARD 17)
-
-project(xdupes VERSION 0.1.0 LANGUAGES CXX)
+project(xdupes VERSION 0.1.1 LANGUAGES CXX)
 
 add_executable(${PROJECT_NAME} src/main.cpp)
 

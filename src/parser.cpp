@@ -1,6 +1,26 @@
 #include "parser.hpp"
 
 
+
+std::unordered_map<parsing::actions, std::string> parsing::actions_mapping = {
+  {actions::store_true, "store_true"},
+  {actions::store_false, "store_false"},
+  {actions::store_const, "store_const"},
+  {actions::store, "store"},
+  {actions::append, "append"},
+  {actions::append_const, "append_const"},
+  {actions::extend, "extend"},
+  {actions::version, "version"},
+  {actions::count, "count"},
+  {actions::help, "help"},
+};
+
+std::unordered_map<parsing::argtypes, std::string> parsing::argtypes_mapping = {
+  {argtypes::positional, "positional"},
+  {argtypes::optional, "optional"},
+};
+
+
 // Set up logger for this file.
 logging::Logger& parsing::logger = logging::get_logger("parser");
 
@@ -11,133 +31,168 @@ void parsing::set_logging_level(std::size_t level) {
 
 
 // Argument implementation
-parsing::Argument::Argument(const std::initializer_list<std::string>& values) : _option_strings(values) {
-  // Verify they have leading hyphens.
-  if (_option_strings.size() > 1) {
-    for (const auto& flag : _option_strings) {
-      if (flag.substr(0, 1) != "-") {
-        logger.error("'Argument' objects containing more than 1 option string must ensure they all have a leading hyphen.");
+parsing::Argument::Argument(const std::initializer_list<std::string>& values) : flags_(values) {
+  // Ensure at least 1 value
+  if (flags_.size() == 0) {
+    logger.error("Argument object must be provided at least one option flag or the dest in the constructor");
+    std::quick_exit(1);
+  }
+  // Check all values for '-'
+  for (const auto& flag : flags_) {
+    // If not prefixed
+    if (flag.substr(0, 1) != "-") {
+      // If it's not the only value, reject it
+      if (flags_.size() != 1) {
+        logger.error("Argument object with multiple option flags must all be prefixed with '-'");
         std::quick_exit(1);
       }
+      // Since it is the only value, it's our dest, it's a positional, and it's required (for now)
+      argtype_ = argtypes::positional;
+      required_ = true;
+      dest_ = flag;
+      break;
     }
-    _argtype = "optional";
+    // While we're here, set dest to the longest value
+    dest_ = (flag.size() > dest_.size()) ? flag : dest_;
   }
-  else if (_option_strings.size() == 1) {
-    if (_option_strings.at(0).substr(0, 1) == "-") {
-      _argtype = "optional";
-    }
-    else {
-      _argtype = "positional";
-      _required = true;
-    }
-  }
-  _dest = *(std::max_element(values.begin(), values.end(), [](const auto& a, const auto& b) { return a.size() < b.size();}));
-  _dest = _dest.substr(_dest.find_first_not_of("-", 0, 2));
-  logger.debug("argument with option strings {" + repr_join(values, ", ") + "} set destination as " + repr(_dest));
+  // Remove at most 2 '-' from beginning
+  dest_ = dest_.substr(dest_.find_first_not_of("-", 0, 2));
 }
 
 auto parsing::Argument::dest(const std::string& value) -> Argument& {
-  if (_argtype == "positional") {
+  if (argtype_ == argtypes::positional) {
     logger.error("'dest' already provided for positional argument");
     std::quick_exit(1);
   }
-  _dest = value;
+  dest_ = value;
   return *this;
 }
 
-auto parsing::Argument::action(const std::string& value) -> Argument& {
-  if (value == "store_true") {
-    _min_nargs = 0;
-    _max_nargs = 0;
-    if (_default.size() == 0) {
-      _default = "false";
+auto parsing::Argument::action(actions value) -> Argument& {
+  switch (value) {
+    case actions::store_true: {
+      min_nargs_ = 0;
+      max_nargs_ = 0;
+      if (default_.size() == 0) {
+        default_ = "false";
+      }
+      if (const_.size() == 0) {
+        const_ = "true";
+      }
+      break;
     }
-    if (_const.size() == 0) {
-      _const = "true";
+    case actions::store_false: {
+      min_nargs_ = 0;
+      max_nargs_ = 0;
+      if (default_.size() == 0) {
+        default_ = "true";
+      }
+      if (const_.size() == 0) {
+        const_ = "false";
+      }
+      break;
+    }
+    case actions::store_const:
+    case actions::append_const:
+    case actions::version:
+    case actions::help:
+    case actions::count: {
+      min_nargs_ = 0;
+      max_nargs_ = 0;
+      break;
+    }
+    case actions::append:
+    case actions::store: {
+      break;
+    }
+    case actions::extend: {
+      logger.error("not implemented: " + actions_mapping[value]);
+      std::quick_exit(1);
+    }
+    default: {
+      logger.error("unrecognized action: " + actions_mapping[value]);
+      std::quick_exit(1);
     }
   }
-  else if (value == "store_false") {
-    _min_nargs = 0;
-    _max_nargs = 0;
-    if (_default.size() == 0) {
-      _default = "true";
-    }
-    if (_const.size() == 0) {
-      _const = "false";
-    }
-  }
-  else if (value == "store_const") {
-    _min_nargs = 0;
-    _max_nargs = 0;
-  }
-  // else if (value == "append" or value == "append_const" or value == "store" or value == "count") {
-  //   _action = value;
-  // }
-  else {
-    logger.error("unrecognized action: " + value);
-    std::quick_exit(1);
-  }
-  _action = value;
+  action_ = value;
   return *this;
 }
 
 auto parsing::Argument::nargs(const std::string& value) -> Argument& {
   if (value == "?") {
-    _min_nargs = 0;
-    _max_nargs = 1;
+    min_nargs_ = 0;
+    max_nargs_ = 1;
   }
   else if (value == "*") {
-    _min_nargs = 0;
-    _max_nargs = -1;
+    min_nargs_ = 0;
+    max_nargs_ = 0;
   }
   else if (value == "+") {
-    _min_nargs = 1;
-    _max_nargs = -1;
+    min_nargs_ = 1;
+    max_nargs_ = 0;
   }
   return *this;
 }
 
 auto parsing::Argument::nargs(std::size_t value) -> Argument& {
-  _min_nargs = 1;
-  _max_nargs = value;
+  min_nargs_ = value;
+  max_nargs_ = value;
   return *this;
 }
 
 auto parsing::Argument::choices(const std::initializer_list<std::string>& values) -> Argument& {
-  _choices = values;
+  choices_ = values;
   return *this;
 }
 
 auto parsing::Argument::const_value(const std::string& value) -> parsing::Argument& {
-  _const = value;
+  const_ = value;
   return *this;
 }
 
 auto parsing::Argument::default_value(const std::string& value) -> parsing::Argument& {
-  _default = value;
+  default_ = value;
   return *this;
 }
 
 auto parsing::Argument::required(bool value) -> Argument& {
-  _required = value;
+  required_ = value;
   return *this;
 }
 
 auto parsing::Argument::help(const std::string& value) -> Argument& {
-  _help = value;
+  help_ = value;
   return *this;
 }
 
 auto parsing::Argument::metavar(const std::string& value) -> Argument& {
-  _metavar = value;
+  metavar_ = value;
   return *this;
+}
+
+
+parsing::ArgumentGroup::ArgumentGroup(std::string name) : name(std::move(name)) {}
+
+void parsing::ArgumentGroup::add_argument(const Argument& argument) {
+  // Size of vector == index after we insert it
+  for (const auto& flag : argument.flags_) {
+    if (flag.substr(0, 1) == "-") {
+      if (flags.count(flag) > 0) {
+        logger.error("ArgumentGroup cannot contain duplicate flag: " + repr(flag));
+        std::quick_exit(1);
+      }
+    }
+  }
+  for (const auto& flag : argument.flags_) {
+    flags.emplace(flag, arguments.size());
+  }
+  arguments.emplace_back(argument);
 }
 
 
 
 // Result implementation
 // This is literal trash, wrote in a haste. Get it the fuck fixed.
-
 parsing::Result::operator bool() const {
   if (values.size() == 0) {
     return false;
@@ -223,120 +278,123 @@ auto parsing::Result::as_ints() -> std::vector<int> {
 
 
 // ArgumentParser implementation
-parsing::ArgumentParser::ArgumentParser(std::string name) : name(std::move(name)) {}
+parsing::ArgumentParser::ArgumentParser(std::string name) : name(std::move(name)) {
+  groups.emplace_back("positional arguments");
+  groups.emplace_back("options");
+  groups.back().add_argument(Argument{"--help", "-h"}.action(actions::help).help("Show this menu and exit."));
+}
 
 void parsing::ArgumentParser::add_argument(const Argument& argument) {
-  if (argument._argtype == "optional") {
-    for (const auto& flag : argument._option_strings) {
-      if (optionals.count(flag) > 0) {
-        logger.error("cannot use the same flag multiple times: " + repr(flag));
-        std::quick_exit(1);
-      }
-      optionals.emplace(flag, argument);
+  switch (argument.argtype_) {
+    case argtypes::positional: {
+      groups[0].add_argument(argument);
+      break;
     }
-  }
-  else if (argument._argtype == "positional") {
-    for (const auto& arg : positionals) {
-      if (arg._dest == argument._dest) {
-        logger.error("cannot use the same dest with multiple positional arguments: " + repr(arg._dest));
-        std::quick_exit(1);
+    case argtypes::optional: {
+      for (const auto& group : groups) {
+        for (const auto& flag : argument.flags_) {
+          if (group.flags.count(flag) > 0) {
+            logger.error("ArgumentParser groups as a whole cannot contain duplicate flag: " + repr(flag));
+            std::quick_exit(1);
+          }
+        }
       }
+      groups[1].add_argument(argument);
+      break;
     }
-    positionals.emplace_back(argument);
-  }
-  else {
-    logger.error("unrecognized argument type: " + repr(argument._argtype));
-    std::quick_exit(1);
+    default: {
+      logger.error("unrecognized argument type: " + repr(argtypes_mapping[argument.argtype_]));
+      std::quick_exit(1);
+    }
   }
 }
 
-auto parsing::ArgumentParser::parse_args(int argc, char** argv) -> std::map<std::string, Result> {
-  std::map<std::string, Result> result;
-
+auto parsing::ArgumentParser::parse_known_args(int argc, char** argv) -> std::pair<std::unordered_map<std::string, Result>, std::vector<std::string>> {
+  std::unordered_map<std::string, Result> result;
   std::vector<std::string> remaining;
-
   std::string value;
-
   std::string arg;
-  bool keep_parsing_options = true;
+  std::optional<Argument> option;
 
   for (int ix = 0; ix < argc; ++ix) {
     arg = argv[ix];
 
     // Whether we have encountered a "--" or not
-    if (keep_parsing_options) {
+    if (arg.substr(0, 1) == "-") {
 
-      // Looks like an option
-      if (arg.substr(0, 1) == "-") {
-
-        // Stop parsing options
-        if (arg == "--") {
-          keep_parsing_options = false;
-          continue;
+      // Stop parsing options
+      if (arg == "--") {
+        for (ix = ix + 1; ix < argc; ++ix) {
+          remaining.emplace_back(argv[ix]);
         }
+        break;
+      }
 
-        // Unrecognized arguments
-        if (optionals.count(arg) == 0) {
-          logger.error("unrecognized option argument: " + repr(arg));
-          std::quick_exit(1);
+      option.reset();
+
+      for (const auto& group : groups) {
+        if (group.flags.count(arg) > 0) {
+          option = group.arguments.at(group.flags.at(arg));
+          break;
         }
+      }
 
-        Argument& option = optionals.at(arg);
+      // Unrecognized arguments
+      if (not option) {
+        logger.error("unrecognized option argument: " + repr(arg));
+        std::quick_exit(1);
+      }
 
-        // Have we seen the argument before?
-        if (result.count(option._dest) > 0) {
-          // If so, then these are the ones that aren't allowed to show up again
-          if ((option._action == "store_true") or (option._action == "store_const") or (option._action == "help") or
-              (option._action == "store_false") or (option._action == "store") or (option._action == "version")) {
+      // Have we seen the argument before?
+      if (result.count(option.value().dest_) > 0) {
+        switch (option.value().action_) {
+          case actions::store_true:
+          case actions::store_false:
+          case actions::store_const:
+          case actions::store:
+          case actions::help:
+          case actions::version: {
             logger.error("option argument already provided: " + repr(arg));
             std::quick_exit(1);
           }
+          default: {
+            break;
+          }
         }
+      }
 
-        // Assign true, held by _const
-        if (option._action == "store_true") {
-          logger.info("store_true");
-          result[option._dest].values.emplace_back(option._const);
+      // Assign true, false, or const, held by const_
+      switch (option.value().action_) {
+        // Append is supposed to append a list, but we can't do that yet. We also haven't implemented version/help yet.
+        case actions::append:
+        case actions::version:
+        case actions::help: {
+          logger.error("append/version/help not yet implemented");
+          std::quick_exit(1);
+        }
+        // Boolean and const flags
+        case actions::store_true:
+        case actions::store_false:
+        case actions::store_const: {
+          result[option.value().dest_].values.emplace_back(option.value().const_);
           continue;
         }
-
-        // Assign false, held by _const
-        if (option._action == "store_false") {
-          logger.info("store_false");
-          result[option._dest].values.emplace_back(option._const);
+        // Intended for... idk?
+        case actions::append_const: {
+          result[option.value().dest_].values.emplace_back(option.value().dest_);
           continue;
         }
-
-        // Assign _const, held by _const
-        if (option._action == "store_const") {
-          logger.info("store_const");
-          // result[option._dest].emplace_bacl(option._const);
-          result[option._dest].values.emplace_back(option._const);
+        // Intended for things like --verbosity
+        case actions::count: {
+          result[option.value().dest_].values.emplace_back("1");
           continue;
         }
-
-        // Append _const, held by _const
-        if (option._action == "append_const") {
-          logger.info("append_const");
-          result[option._dest].values.emplace_back(option._const);
-          continue;
-        }
-
-        // Increment
-        if (option._action == "count") {
-          logger.info("count");
-          result[option._dest].values.emplace_back("1");
-          continue;
-        }
-
-        // Appends N amount of items to the result, as a vector. Cannot implement at this time.
-        // else if (option._action == "append") {
-        //   result[option._dest].emplace_back();
-        // }
-
-        // Appends N amount of items to the result, individually.
-        if (option._action == "extend") {
-          while ((ix <= argc) and (remaining.size() < option._max_nargs)) {
+        // Intended for multiple values
+        case actions::extend: {
+          while (ix < (argc - 1)) {
+            if (result[option.value().dest_].values.size() < option.value().max_nargs_) {
+              break;
+            }
             ++ix;
             value = argv[ix];
             // It's possible we're parsing an unknown amount of args, and so it's possible for an option to be valid
@@ -344,91 +402,162 @@ auto parsing::ArgumentParser::parse_args(int argc, char** argv) -> std::map<std:
             // Can it be decremented?
             if (value.substr(0, 1) == "-") {
               break;
-              // --ix;
             }
-            result[option._dest].values.emplace_back(value);
+            result[option.value().dest_].values.emplace_back(value);
           }
-          if (remaining.size() < option._min_nargs) {
-            logger.error(repr(arg) + " expects at least " + std::to_string(option._min_nargs) + " values, but got " + std::to_string(remaining.size()));
+          if (result[option.value().dest_].values.size() < option.value().min_nargs_) {
+            logger.error(repr(arg) + " expects at least " + repr(option.value().min_nargs_) + " values, but got " + repr(result[option.value().dest_].values.size()));
             std::quick_exit(1);
           }
           continue;
         }
-
         // Intended for a single value
-        if (option._action == "store") {
-          if (ix >= (argc - 1)) {
+        case actions::store: {
+          ++ix;
+          if (ix >= argc) {
             logger.error(repr(arg) + " expects exactly 1 value, but got 0");
             std::quick_exit(1);
           }
-          ++ix;
           value = argv[ix];
           if (value.substr(0, 1) == "-") {
-            logger.error(repr(arg) + " expects exactly 1 value, but encountered an ambiguous argument: " + repr(arg));
+            logger.error(repr(arg) + " expects exactly 1 value, but encountered an ambiguous argument: " + repr(value));
             std::quick_exit(1);
           }
-          result[option._dest].values.emplace_back(value);
+          result[option.value().dest_].values.emplace_back(value);
           continue;
         }
-
-        // Unrecognized action. This was checked during creation of the Argument, but check again anyway.
-        logger.error("Unrecognized action: " + repr(option._action));
-        std::quick_exit(1);
+        // Fallthrough
+        default: {
+          logger.error("Unrecognized action: " + repr(actions_mapping[option.value().action_]));
+          std::quick_exit(1);
+        }
       }
     }
 
-    // Positional
+    //Positional
     remaining.emplace_back(arg);
   }
 
-  std::vector<std::size_t> layout;
+  // Track min, max, and whether an exact number is needed
+  // While it may seem like (exact) == (total_min == total_max), it's not. A '?' narg will have 0 min and 1 max, and a
+  // '+' narg will have 1 min and 0 max. These balance out and create a false positive. What we actually want is
+  // (exact) == (min == max) for every iteration of the loop.
   std::size_t minimum = 0;
   std::size_t maximum = 0;
+  bool exact = true;
 
-  for (const auto& position : positionals) {
-    layout.emplace_back(position._min_nargs);
-    minimum += position._min_nargs;
-    maximum += position._max_nargs;
+  // Jesus
+  for (const auto& group : groups) {
+    for (const auto& opt : group.arguments) {
+      if (opt.argtype_ == argtypes::positional) {
+        minimum += opt.min_nargs_;
+        maximum += opt.max_nargs_;
+        if (opt.min_nargs_ != opt.max_nargs_ and opt.max_nargs_ == 0) {
+          exact = false;
+        }
+      }
+    }
   }
 
+  // Check for too few arguments
   if (remaining.size() < minimum) {
-    logger.error("not enough positional arguments: expecting at least " + std::to_string(minimum) + ", but got " + std::to_string(remaining.size()));
-    std::quick_exit(1);
-  }
-  else if (remaining.size() > maximum) {
-    logger.error("too many positional arguments: expecting at most " + std::to_string(maximum) + ", but got " + std::to_string(remaining.size()));
-    std::quick_exit(1);
+    std::string dest;
+    std::size_t subtotal = 0;
+    for (const auto& group : groups) {
+      for (const auto& opt : group.arguments) {
+        if (opt.argtype_ == argtypes::optional) {
+          continue;
+        }
+        subtotal += opt.min_nargs_;
+        dest = opt.dest_;
+        if (subtotal > remaining.size()) {
+          break;
+        }
+      }
+    }
+    logger.error("missing positional argument: " + dest);
+    std::exit(1);
   }
 
-  while (positionals.size() > 0) {
-    auto position = positionals.back();
-    positionals.erase(positionals.end());
-    while (result[position._dest].values.size() < position._min_nargs) {
-      auto value = remaining.back();
-      remaining.erase(remaining.end());
-      result[position._dest].values.insert(result[position._dest].values.begin(), value);
+  // If it's exact, then we have exactly the right amount
+  if (exact) {
+    auto it = remaining.begin();
+    for (const auto& group : groups) {
+      for (const auto& opt: group.arguments) {
+        if (opt.argtype_ == argtypes::optional) {
+          continue;
+        }
+        for (std::size_t ix = 0; ix < opt.min_nargs_; ++ix, ++it) {
+          result[opt.dest_].values.emplace_back(*it);
+        }
+      }
     }
-    if (positionals.size() == 0) {
-      while (remaining.size()) {
-        auto value = remaining.back();
-        remaining.erase(remaining.end());
-        result[position._dest].values.insert(result[position._dest].values.begin(), value);
+
+    // This replaced an error check that used to be right after the "too few args" check
+    if (it != remaining.end()) {
+      logger.error("unrecognized positional argument: " + remaining.at(maximum));
+      std::exit(1);
+    }
+  }
+  // And finally, the check for variable number of arguments
+  else {
+    // Create layout of minimum required arguments per index
+    std::size_t known = 0;
+    for (const auto& group : groups) {
+      for (const auto& opt: group.arguments) {
+        if (opt.argtype_ == argtypes::optional) {
+          continue;
+        }
+        if (opt.min_nargs_ == 1) {
+          known += opt.min_nargs_;
+        }
+      }
+    }
+
+    // Distribute them
+    std::size_t pix = 0;
+    for (const auto& group : groups) {
+      for (const auto& opt: group.arguments) {
+        if (opt.argtype_ == argtypes::optional) {
+          continue;
+        }
+        // Exactly X
+        if (opt.min_nargs_ == opt.max_nargs_) {
+          for (std::size_t ix = 0; ix < opt.min_nargs_; ++ix) {
+            result[opt.dest_].values.emplace_back(remaining.at(pix));
+            ++pix;
+          }
+        }
+
+        // 0 or 1
+        else if (opt.min_nargs_ == 0 and opt.max_nargs_ == 1) {
+          if ((remaining.size() - known) > 0) {
+            result[opt.dest_].values.emplace_back(remaining.at(pix));
+            ++pix;
+          }
+        }
+
+        // 0 or more and 1 or more
+        else if (opt.max_nargs_ == 0) {
+          for (std::size_t ix = 0; ix < (remaining.size() - known); ++ix) {
+            result[opt.dest_].values.emplace_back(remaining.at(pix));
+            ++pix;
+          }
+        }
       }
     }
   }
 
-  for (const auto& [key, value] : optionals) {
-    if (result.count(value._dest) == 0) {
-      if (value._default.size() > 0) {
-        result[value._dest].values.emplace_back(value._default);
-      }
-    }
-  }
-  // for (const auto& item : positionals) {
-  //   if (result.count(item._dest) == 0) {
-  //     result.emplace(item._dest, Result{});
-  //   }
-  // }
-
-  return result;
+  std::vector<std::string> other;
+  return std::make_pair(result, other);
 }
+
+auto parsing::ArgumentParser::parse_args(int argc, char** argv) -> std::unordered_map<std::string, Result> {
+  auto [args, options] = parse_known_args(argc, argv);
+  if (not options.empty()) {
+    logger.error("unrecognized options");
+    std::exit(1);
+  }
+  return args;
+}
+

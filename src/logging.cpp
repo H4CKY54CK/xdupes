@@ -7,6 +7,9 @@
 logging::Logger::Logger(std::string name, std::size_t loglevel) : name(std::move(name)), loglevel(loglevel) {
   level_names = {{10, "debug"},{20, "info"},{30, "warn"},{40, "error"},{50, "critical"}};
   level_colors = {{0, "\x1b[00m"},{10, "\x1b[36m"},{20, "\x1b[32m"},{30, "\x1b[33m"},{40, "\x1b[31m"},{50, "\x1b[41m"}};
+  if (isatty(2) == 0) {
+    level_colors = {};
+  }
 }
 logging::Logger::Logger(std::string name) : Logger(std::move(name), 30) {}
 
@@ -20,23 +23,14 @@ void logging::Logger::set_level(std::size_t level) {
   loglevel = level;
 }
 
-// Get level color for an instance of a logger
-auto logging::Logger::get_level_color(std::size_t level) -> std::string {
-  return level_colors[level];
-}
-
-// Get level name for an instance of a logger
-auto logging::Logger::get_level_name(std::size_t level) -> std::string {
-  return level_names[level];
-}
-
 // Emit local logger messages
 void logging::Logger::log(std::size_t level, const std::string& msg) {
-  if (level >= loglevel) {
-    std::cerr << get_level_color(level) << "[" << name << " "
-              << get_level_name(level) << "]" << get_level_color(0)
-              << ": " << msg << "\n";
-  }
+  if (level < loglevel) { return; }
+  std::ostringstream oss;
+  auto color = level_colors[level];
+  auto reset = level_colors[0];
+  oss << color << "[" << name << " " << level_names[level] << "]" << reset << ": " << msg << std::endl;
+  std::clog << oss.str();
 }
 void logging::Logger::fatal(const std::string& msg) {
   log(50, msg);

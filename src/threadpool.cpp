@@ -26,6 +26,7 @@ auto ThreadPool::loop() -> void {
   }
   std::ifstream ifs;
   std::array<char, 1048576> buffer;
+  XXH128_hash_t hash;
 
   while (true) {
     std::string task;
@@ -44,7 +45,7 @@ auto ThreadPool::loop() -> void {
       tasks.pop();
     }
 
-    ifs = std::ifstream(task, std::ifstream::binary);
+    ifs = std::ifstream(task, std::ios_base::binary);
     if (ifs.is_open()) {
       while (ifs.good()) {
         ifs.read(buffer.data(), 1048576);
@@ -55,7 +56,7 @@ auto ThreadPool::loop() -> void {
       ifs.close();
     }
 
-    XXH128_hash_t hash = XXH3_128bits_digest(state);
+    hash = XXH3_128bits_digest(state);
     {
       std::unique_lock<std::mutex> lock(results_mutex);
       results[hash.low64][hash.high64].emplace_back(task);

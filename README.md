@@ -3,13 +3,10 @@
 I've recently switched from Make to CMake. Here are the new build instructions:
 
 ```bash
-mkdir build
-cd build
-cmake --preset optimized ..
-make -j 4
-# There is currently no install command. But the executable should be right in front of you, in ./build/
+cmake --workflow --preset release
+# There is currently no install command. But the executable should be right in ./build/
 # Try it out on the current working directory. If there is no output, there are no duplicates.
-./xdupes --recursive ./
+./build/xdupes --recursive ./
 # If you're bold, go ahead and immediately run it on your Pictures directory. Files are only ever read, so don't worry
 # about files being removed or anything. You should still be paranoid and try some test directories first.
 ```
