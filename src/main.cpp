@@ -1,5 +1,5 @@
+#include "parsing.hpp"
 #include "logging.hpp"
-#include "parser.hpp"
 #include "progressbar.hpp"
 #include "threadpool.hpp"
 #include "utils.hpp"
@@ -58,7 +58,7 @@ auto main(int argc, char** argv) -> int {
 
   std::sort(sources.begin(), sources.end(), [](auto left, auto right) { return left < right; });
 
-  std::vector<std::string> stack;
+  std::deque<std::string> stack;
   std::string path;
 
   for (const auto& item : sources) {
@@ -86,7 +86,7 @@ auto main(int argc, char** argv) -> int {
 
   while (!stack.empty()) {
     source = stack.front();
-    stack.erase(stack.begin());
+    stack.pop_front();
 
     if (progress) {
       std::cout << "Files Walked: " << total_walked << "\x1b[u";
@@ -231,83 +231,68 @@ auto main(int argc, char** argv) -> int {
   return 0;
 }
 
+
+
 auto create_parser() -> parsing::ArgumentParser {
-  parsing::ArgumentParser parser("xdupes");
+  parsing::ArgumentParser parser("hacky");
+  parser.add_help(false);
 
-  parser.add_argument(
-    parsing::Argument({"sources"})
+  auto& positional_group = parser.add_argument_group("Positional");
+  positional_group.add_argument("sources")
       .nargs("+")
-      .help("Path(s) to SOURCE directories to check for file duplicates in.")
-  );
+      .help("Path(s) to SOURCE directories to check for file duplicates in.");
 
-  parser.add_argument(
-    parsing::Argument({"--threads", "-t"})
+  auto& inner_group = parser.add_argument_group("General");
+  inner_group.add_argument({"--threads", "-t"})
       .default_value("1")
-      .help("How many threads to use.")
-  );
-  parser.add_argument(
-    parsing::Argument({"--recursive", "-r"})
+      .help("How many threads to use.");
+  inner_group.add_argument({"--recursive", "-r"})
       .action(parsing::actions::store_true)
-      .help("Walk all subdirectories of SOURCES.")
-  );
-  parser.add_argument(
-    parsing::Argument({"--noempty", "--skip-empty"})
+      .help("Walk all subdirectories of SOURCES.");
+  inner_group.add_argument({"--noempty", "--skip-empty"})
       .action(parsing::actions::store_true)
-      .help("Skip empty files (all empty files hash to the same value, so it's worth skipping them. This may default to true in the future.).")
-  );
+      .help("Skip empty files (all empty files hash to the same value, so it's worth skipping them. This may default to true in the future.).");
 
-  parser.add_argument(
-    parsing::Argument({"--quiet", "-q"})
+  inner_group.add_argument({"--si", "--binary"})
       .action(parsing::actions::store_true)
-      .help("Don't display the files (still displays anything else that is normally displayed).")
-  );
-  parser.add_argument(
-    parsing::Argument({"--silent", "-s"})
-      .action(parsing::actions::store_true)
-      .help("Show no output.")
-  );
-
-  parser.add_argument(
-    parsing::Argument({"--loglevel"})
-      .dest("loglevel")
-      .default_value("30")
-      .help("Adjust the logging level manually.")
-  );
-  parser.add_argument(
-    parsing::Argument({"--debug"})
-      .dest("loglevel")
-      .action(parsing::actions::store_const)
-      .const_value("10")
-      .help("Show all output.")
-  );
-
-  parser.add_argument(
-    parsing::Argument({"--timed"})
-      .action(parsing::actions::store_true)
-      .help("Show elapsed time from the moment parsing has finished to the moment the program is done doing its work.")
-  );
-  parser.add_argument(
-    parsing::Argument({"--wasted", "--wasted-space"})
-      .action(parsing::actions::store_true)
-      .help("Show total_hashed space taken up by duplicate files (not including the unique one).")
-  );
-  parser.add_argument(
-    parsing::Argument({"--si", "--binary"})
-      .action(parsing::actions::store_true)
-      .help("Use binary prefixes (KiB, MiB, etc.) instead of the default (KB, MB, etc.).")
-  );
-  parser.add_argument(
-    parsing::Argument({"--progress"})
-      .action(parsing::actions::store_true)
-      .help("Show a helpful progress bar instead of the nothing that currently gets shown.")
-  );
-  parser.add_argument(
-    parsing::Argument({"--zero"})
+      .help("Use binary prefixes (KiB, MiB, etc.) instead of the default (KB, MB, etc.).");
+  inner_group.add_argument({"--zero"})
       .dest("separator")
       .default_value("\n")
       .const_value("\0")
       .action(parsing::actions::store_const)
-      .help("Use a null-terminator instead of newline to separate files and groups in the output.")
-  );
+      .help("Use a null-terminator instead of newline to separate files and groups in the output.");
+
+  auto& output_group = parser.add_argument_group("Output");
+  output_group.add_argument({"--quiet", "-q"})
+      .action(parsing::actions::store_true)
+      .help("Don't display the files (still displays anything else that is normally displayed).");
+  output_group.add_argument({"--silent", "-s"})
+      .action(parsing::actions::store_true)
+      .help("Show no output.");
+  output_group.add_argument({"--loglevel"})
+      .dest("loglevel")
+      .default_value("30")
+      .help("Adjust the logging level manually.");
+  output_group.add_argument({"--debug"})
+      .dest("loglevel")
+      .action(parsing::actions::store_const)
+      .const_value("10")
+      .help("Show all output.");
+
+  auto& info_group = parser.add_argument_group("Informational");
+  info_group.add_argument({"--progress"})
+      .action(parsing::actions::store_true)
+      .help("Show a helpful progress bar instead of the nothing that currently gets shown.");
+  info_group.add_argument({"--timed"})
+      .action(parsing::actions::store_true)
+      .help("Show elapsed time from the moment parsing has finished to the moment the program is done doing its work.");
+  info_group.add_argument({"--wasted", "--wasted-space"})
+      .action(parsing::actions::store_true)
+      .help("Show total space taken up by duplicate files (not including the unique one).");
+  info_group.add_argument({"--help", "-h"})
+      .action(parsing::actions::help)
+      .help("Show this help menu and then exit.");
+
   return parser;
 }
