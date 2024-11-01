@@ -21,6 +21,7 @@ and this project strives to (when it remembers) adhere to [Semantic Versioning](
 ### Fixed
 
 - Duplicate directories, and subdirectories of other directories provided in the same argument list, now get deduplicated as needed. Work is no longer being done multiple times, and results are now reliable no matter how many times you provide the same directory to the program in the same invocation.
+- If the progress bar was not requested, then the cursor position never got saved, and so when the cleanup code got triggered from being interrupted (i.e. a `Ctrl+C`), the cursor position was being **restored** when it had never been previously **saved**. This caused the cursor to be moved to the top left of the screen buffer when it should have only ever been been moved to the beginning of the current line or the next line. This has been fixed by saving the cursor position at the earliest possible point, so that discriminate cleanup can still happen.
 
 ### Changed
 
