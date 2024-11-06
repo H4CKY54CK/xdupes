@@ -237,7 +237,7 @@ auto main(int argc, char** argv) -> int {
 
 
 auto create_parser() -> parsing::ArgumentParser {
-  parsing::ArgumentParser parser("hacky");
+  parsing::ArgumentParser parser = parsing::ArgumentParser::create_parser("hacky");
   parser.add_help(false);
 
   parsing::ActionGroup& positional_group = parser.add_argument_group("Positional");

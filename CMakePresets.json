@@ -33,7 +33,7 @@
       "displayName": "Release",
       "description": "Release Preset",
       "cacheVariables": {
-        "CMAKE_CXX_FLAGS": "-O2 -march=native -mtune=native"
+        "CMAKE_CXX_FLAGS": "-O3"
       }
     },
     {
