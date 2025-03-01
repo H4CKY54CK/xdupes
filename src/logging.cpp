@@ -29,7 +29,7 @@ void logging::Logger::log(std::size_t level, const std::string& msg) {
   std::ostringstream oss;
   auto color = level_colors[level];
   auto reset = level_colors[0];
-  oss << color << "[" << name << " " << level_names[level] << "]" << reset << ": " << msg << std::endl;
+  oss << color << "[" << name << " " << level_names[level] << "]" << reset << ": " << msg << '\n';
   std::clog << oss.str();
 }
 void logging::Logger::fatal(const std::string& msg) {

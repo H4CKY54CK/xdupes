@@ -84,7 +84,7 @@ auto main(int argc, char** argv) -> int {
 
   // Hide cursor
   if (progress) {
-    std::cout << "\x1b[?25l\x1b[";
+    std::cout << "\x1b[?25l";
   }
 
   while (!stack.empty()) {
@@ -197,17 +197,71 @@ auto main(int argc, char** argv) -> int {
 
   std::size_t total_wasted = 0;
 
+  std::string dryrun_action;
+
+  fs::copy_options copy_options;
+
+  if (options["replace"].as_string() == "symlink") {
+    copy_options = fs::copy_options::create_symlinks;
+    dryrun_action = "Symlinking";
+  }
+  else if (options["replace"].as_string() == "hardlink") {
+    copy_options = fs::copy_options::create_hard_links;
+    dryrun_action = "Hardlinking";
+  }
+  else if (options["replace"].as_string() != "none") {
+    logger.error("invalid value for '--replace': " + repr(options["replace"].as_string()));
+    return -1;
+  }
+
+  std::vector<std::string> nonlinks;
+
   for (const auto& [high, inner] : tp.results) {
     for (const auto& [low, files] : inner) {
       if (files.size() < 2) {
         continue;
       }
-      total_wasted += fs::file_size(files.at(0)) * (files.size() - 1);
-      if (!quiet and !silent) {
-        for (const auto& item : files) {
-          std::cout << item << options["separator"].as_char();
+
+      nonlinks = {files.at(0)};
+
+      for (std::size_t ix = 1; ix < files.size(); ++ix) {
+        if (fs::equivalent(files.at(0), files.at(ix))) {
+          continue;
         }
-        std::cout << options["separator"].as_char();
+        nonlinks.push_back(files.at(ix));
+      }
+
+      if (nonlinks.size() < 2) {
+        continue;
+      }
+
+      if (options["replace"].as_string() == "none") {
+        total_wasted += fs::file_size(nonlinks.at(0)) * (nonlinks.size() - 1);
+
+        if (!quiet and !silent) {
+          for (const auto& item : nonlinks) {
+            std::cout << item << options["separator"].as_char();
+          }
+          std::cout << options["separator"].as_char();
+        }
+        continue;
+      }
+
+      if (options["dryrun"].as_bool()) {
+        std::cout << "Keeping: " << repr(nonlinks.at(0)) << '\n';
+      }
+
+      for (std::size_t ix = 1; ix < nonlinks.size(); ++ix) {
+        if (not options["dryrun"].as_bool()) {
+          fs::remove(nonlinks.at(ix));
+          fs::copy(nonlinks.at(0), nonlinks.at(ix), copy_options);
+          continue;
+        }
+        std::cout << dryrun_action << ": " << repr(nonlinks.at(ix)) << '\n';
+      }
+
+      if (options["dryrun"].as_bool()) {
+        std::cout << '\n';
       }
     }
   }
@@ -255,7 +309,12 @@ auto create_parser() -> parsing::ArgumentParser {
   inner_group.add_argument({"--noempty", "--skip-empty"})
       .action(parsing::actions::store_true)
       .help("Skip empty files (all empty files hash to the same value, so it's worth skipping them. This may default to true in the future.).");
-
+  inner_group.add_argument({"--replace"})
+      .default_value("none")
+      .help("Replace duplicate files with either a hardlink or a symlink to the original.");
+  inner_group.add_argument({"--dryrun"})
+      .action(parsing::actions::store_true)
+      .help("Don't actually take any actions. Just print what would have been done.");
   inner_group.add_argument({"--si", "--binary"})
       .action(parsing::actions::store_true)
       .help("Use binary prefixes (KiB, MiB, etc.) instead of the default (KB, MB, etc.).");

@@ -2,7 +2,7 @@
   "version": 6,
   "cmakeMinimumRequired": {
     "major": 3,
-    "minor": 25,
+    "minor": 26,
     "patch": 0
   },
 
@@ -33,7 +33,7 @@
       "displayName": "Release",
       "description": "Release Preset",
       "cacheVariables": {
-        "CMAKE_CXX_FLAGS": "-O3"
+        "CMAKE_CXX_FLAGS": "-O3 -march=native"
       }
     },
     {
@@ -128,7 +128,7 @@
   ],
 
   "vendor": {
-    "hashjacks.com/xdupes/0.1.1": {
+    "hashjacks.com/xdupes/0.2.0": {
       "debug": false
     }
   }

@@ -5,7 +5,7 @@
 // Signal handler for when progress bar gets cancelled
 void restore_terminal(int s) {
   // Clear line, restore cursor position, unhide cursor.
-  std::cout << "\x1b[?25h\x1b[u\x1b[2KCancelled by user..." << std::endl;
+  std::cout << "\x1b[?25h\x1b[u\x1b[2KCancelled by user..." << '\n';
   std::quick_exit(s);
 }
 
