@@ -1,6 +1,6 @@
 [submodule "deps/xxhash"]
 	path = deps/xxhash
-	url = git@github.com:Cyan4973/xxHash.git
+	url = https://github.com:Cyan4973/xxHash.git
 [submodule "deps/parsing"]
 	path = deps/parsing
-	url = git@github.com:H4CKY54CK/parsing.git
+	url = https://github.com/H4CKY54CK/parsing.git
