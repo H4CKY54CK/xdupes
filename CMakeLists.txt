@@ -11,4 +11,4 @@ target_include_directories(${PROJECT_NAME} PRIVATE include deps/parsing/include)
 
 add_subdirectory(deps/parsing)
 
-target_link_libraries(${PROJECT_NAME} PRIVATE parsing)
+target_link_libraries(${PROJECT_NAME} PRIVATE parsing pthread)
