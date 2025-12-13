@@ -69,8 +69,6 @@ Usage:
 
     Boolean Arguments (cont.) - Options that affect how the output is written, and also the debug options.
         `--quiet`/`-q`
-            Produce less output.
-        `--quiet`/`-q`
             Produce no output.
         `--debug`
             Show some more information regarding what happened (currently just includes thread count and more detailed
